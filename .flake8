@@ -1,0 +1,3 @@
+[flacke8]
+extend-exclude=serverless_model/
+extend-ignore=W291
