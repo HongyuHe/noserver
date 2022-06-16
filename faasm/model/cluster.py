@@ -5,26 +5,14 @@ from .components import *
 from simulation import *
 
 class Cluster(object):
-    def __init__(self, nodes, functions, scheduling_policy='bin-packing'):
+    def __init__(self, nodes, functions: Function, scheduling_policy='bin-packing'):
         self.nodes = nodes
         self.functions = functions
         self.throttler = Throttler(functions)
         self.autoscaler = Autoscaler(functions)
-        
-        self.routes = {func.name:'throttle' for func in self.functions} # func_name: <direct> | <throttle>
-        self.scheduling_latency_milli = 10 # 10ms per e2e placement.
     
-    def accept(self, request):
-        if self.routes[request.dest] == 'throttle':
-            log.info(f"Throttle {request}")
-            
-            is_cold = self.throttler.enqueue(request)
-            if is_cold:
-                log.info("Proxy mode")
-            else:
-                log.info("[Not implemented] Serve mode")
-        else:
-            log.info(f"Route {request}")
+    def accept(self, request: Request):
+        self.throttler.handle(request)
 
     def __repr__(self):
         return "Cluster" + repr(vars(self))     
@@ -41,3 +29,10 @@ class Node(object):
 
     def __repr__(self):
         return "Node" + repr(vars(self))
+
+class InstanceEngine(object):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return "InstanceEngine" + repr(vars(self))

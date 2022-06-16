@@ -1,3 +1,20 @@
+import sys
+sys.path.append("..") 
+
+from simulation import *
+from .components import *
+
+class Request(object):
+    def __init__(self, timestamp, dest, duration, memory):
+        self.start = timestamp
+        self.dest = dest
+        self.duration = duration
+        self.memory = memory
+        
+        self.end = None
+        
+    def __repr__(self):
+        return "Request" + repr(vars(self))
 class Function(object):
     def __init__(self, name, concurrency_limit=1, lb_policy='round-robin'):
         self.name = name
@@ -19,45 +36,37 @@ class Function(object):
         return len(self.instances)
 
 class Instance(object):
-    def __init__(self, name, runtime, memory_mib):
+    def __init__(self, name, duration, memory_mib):
         self.name = name
-        self.runtime = runtime
         self.memory_mib = memory_mib
+        self.duration_milli = duration
 
         self.idle = True
-        self.capacity = 10 + self.concurrency_limit
         self.job_start = 0
         self.age_milli = 0
-        self.request_queue = []
+
+        self.capacity = 10 + self.concurrency_limit
+        self.breaker = Breaker(self.name, self.capacity)
     
-    def reserve(self, request):
+    def reserve(self, request: Request):
         if len(self.request_queue) > self.capacity:
-            # Throw for now
-            raise RuntimeError('503 Instance queue full')
+            log.info("No free slots")
+            return False
         else:
             if self.idle:
                 #TODO: Dequeue + run()
                 self.idle = False
                 self.serve(request)
             else:
-                self.request_queue.append(request)
+                log.info("Reserved a slot")
+                self.breaker.enqueue(request)
+            
+            return True
     
-    def serve(self, request):
+    def serve(self, request: Request):
         #TODO
-        log.info("[Not implemented] Serve")
+        log.info(f"[Not implemented] Serving {request}")
 
     
     def __repr__(self):
         return "Instance" + repr(vars(self))
-
-class Request(object):
-    def __init__(self, timestamp, dest, duration, memory):
-        self.start = timestamp
-        self.dest = dest
-        self.duration = duration
-        self.memory = memory
-        
-        self.end = None
-        
-    def __repr__(self):
-        return "Request" + repr(vars(self))

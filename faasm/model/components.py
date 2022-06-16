@@ -1,4 +1,5 @@
 from .function import *
+from typing import *
 
 class Autoscaler(object):
     def __init__(self, functions, metric='concurrency', agg_method='average'):
@@ -8,52 +9,76 @@ class Autoscaler(object):
         
         self.coldstart_latency_milli = 3e3 # Cold start penalty 3s. (warm:  1-2ms)
     
-    def schedule(self):
-        pass
-    
     def update_scales(self):
         pass
+
+    def coldstart(self, func: Function):
+        pass 
+        # TODO: Invoke InstanceEngine!
+
     
     def __repr__(self):
         return "Autoscaler" + repr(vars(self))
 
 class Throttler(object):
-    
-    class _Breaker_():
-        def __init__(self, function: Function, lb_policy: str='first-fit'):
-            self.lb_policy = lb_policy # Centralised LB.
-            self.function = function
-            self.inflight = 0
+    def __init__(self, functions: List[Function]):
+        self.breaker = Breaker('Throttler', 10_000)
+        self.trackers = {func.name: self._Tracker_(func) for func in functions}
             
-        def __repr__(self):
-            return "_Breaker_" + repr(vars(self))
+    def handle(self, request: Request):
+        log.info(f"Handle {request}")
+        tracker = self.trackers[request.dest]
+        tracker.breaker.enqueue(request)
+
+        if len(tracker.instances) == 0:
+            log.info(f"Cold start occurred on {request.dest}")
+            # TODO: Poke Autoscaler!
         
-        def hit(self, request):
-            self.inflight += 1
-            if self.function.get_slots() < self.inflight:
-                ## No available slots. 
-                return True
-            else:
-                #TODO: Add latency
-                for instance in self.function.instances:
-                    instance.reserve(request)
-                return False
-    
-    def __init__(self, functions):
-        self.trackers = {func.name: self._Breaker_(func) for func in functions}
+        processed = False
+        for instance in tracker.instances:
+            processed = instance.reserve(request)
         
-        self.shared_queue = []
-        self.capacity = 10_000
-    
-    def enqueue(self, request):
-        if len(self.shared_queue) > self.capacity:
-            # Throw for now
-            raise RuntimeError('503 Throttler queue full')
-        else:
-            # TODO: Dequeue!
-            self.shared_queue.append(request)
-            return self.trackers[request.dest].hit(request)
-            
+        if not processed:
+            log.warn(f"No capacity to process {request}")   
+
+
             
     def __repr__(self):
         return "Throttler" + repr(vars(self))
+    
+    class _Tracker_(object):
+        def __init__(self, func: Function):
+            self.breaker = Breaker(f"_Tracker_::{func.name}", 10_000)
+            self.function = func
+            self.instances: List[Instance] = []
+        def __repr__(self):
+            return "_Tracker_" + repr(vars(self))
+
+
+class Breaker(object):
+    def __init__(self, owner: str, capacity: int):
+        self.owner = owner
+        self.queue = []
+        self.capacity = capacity
+
+    def enqueue(self, request: Request):
+        log.info(f"Enqueue {request}")
+
+        if len(self.queue) < self.capacity:
+            self.queue.append(request)
+        else:
+            log.fatal(f"{self.owner} Breaker overload")
+    
+    def dequeue(self, request: Request):
+        log.info(f"Dequeue {request}")
+        self.queue.remove(request)
+
+    def __repr__(self):
+        return "Breaker" + repr(vars(self))
+
+class Scheduler(object):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return "Scheduler" + repr(vars(self))
