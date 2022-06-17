@@ -1,3 +1,5 @@
+.idea
+
 # Byte-compiled / optimized / DLL files
 *.parque
 __pycache__/

@@ -1,10 +1,26 @@
-import logging as log
+import logging
 
+class Formatter(logging.Formatter):
+    def format(self, record):
+        record.clock = '\t'
+        if(record.args):
+            record.clock = record.args.get("clock", "")
+        return super().format(record)
 
-log.basicConfig(
-    level=log.INFO,
-    format='(%(asctime)s) [%(levelname)s] %(message)s'
+log = logging.getLogger('')
+ch = logging.StreamHandler()
+# ch.setLevel(logging.INFO)
+formatter = Formatter('(%(clock)s) [%(levelname)s] %(message)s')
+ch.setFormatter(formatter)
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[ch],
+#     # format='(%(asctime)s) [%(levelname)s] %(message)s'
 )
+# log.addHandler(ch)
+
+
+state = None
 
 class Clock(object):
     def __init__(self):

@@ -1,9 +1,8 @@
+from lib2to3.pytree import Node
 import sys
 sys.path.append("..") 
 
 from simulation import *
-from .components import *
-
 class Request(object):
     def __init__(self, timestamp, dest, duration, memory):
         self.start = timestamp
@@ -36,20 +35,21 @@ class Function(object):
         return len(self.instances)
 
 class Instance(object):
-    def __init__(self, name, duration, memory_mib):
-        self.name = name
-        self.memory_mib = memory_mib
-        self.duration_milli = duration
+    def __init__(self, func, node: Node):
+        self.func = func
+        self.node = node
+        # self.memory_mib = memory_mib
+        # self.duration_milli = duration
 
         self.idle = True
         self.job_start = 0
         self.age_milli = 0
 
-        self.capacity = 10 + self.concurrency_limit
-        self.breaker = Breaker(self.name, self.capacity)
+        self.capacity = 10 + 1 # self.concurrency_limit
+        self.breaker = Breaker(f"Instance {self.func}", self.capacity)
     
     def reserve(self, request: Request):
-        if len(self.request_queue) > self.capacity:
+        if not self.breaker.has_slots():
             log.info("No free slots")
             return False
         else:
@@ -70,3 +70,27 @@ class Instance(object):
     
     def __repr__(self):
         return "Instance" + repr(vars(self))
+
+class Breaker(object):
+    def __init__(self, owner: str, capacity: int):
+        self.owner = owner
+        self.queue = []
+        self.capacity = capacity
+
+    def has_slots(self):
+        return self.capacity > len(self.queue)
+        
+    def enqueue(self, request: Request):
+        log.info(f"Enqueue {request.dest}")
+
+        if len(self.queue) < self.capacity:
+            self.queue.append(request)
+        else:
+            log.fatal(f"{self.owner} Breaker overload")
+    
+    def dequeue(self, request: Request):
+        log.info(f"Dequeue {request}")
+        self.queue.remove(request)
+
+    def __repr__(self):
+        return "Breaker" + repr(vars(self))
