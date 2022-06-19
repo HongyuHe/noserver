@@ -56,7 +56,7 @@ class Node(object):
     def yield_core(self, instance: Instance, request: Request):
         for core, status in self.cpu_registry.items():
             if status == instance:
-                self.cpu_registry[core] = instance
+                self.cpu_registry[core] = None
         self.sink.append(request)
         return
 

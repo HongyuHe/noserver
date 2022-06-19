@@ -22,29 +22,40 @@ class Autoscaler(object):
             func.name: self._Scaler_(func) for func in functions
         }
 
-    def poke(self):
-        self.evaluate(is_poked=True)
+    def poke(self, request: Request):
+        self.evaluate(request)
         return
 
-    def evaluate(self, is_poked=False):
+    def evaluate(self, request: Request = None):
+        def compute_observed_cc(concurrencies, window):
+            window = min(len(concurrencies), window)
+            return sum(concurrencies[-window:]) / window
+
         for func, tracker in sim.state.throttler.trackers.items():
+            if request is not None and request.dest != func:
+                # * Poked by the throttler.
+                continue
             concurrencies: List[int] = tracker.concurrencies
             actual_scale = tracker.get_scale()
-            ready_pod = actual_scale if actual_scale != 0 else 1  # https://github.com/knative/serving/blob/main/pkg/autoscaler/scaling/autoscaler.go#L151
+            # https://github.com/knative/serving/blob/main/pkg/autoscaler/scaling/autoscaler.go#L151
+            ready_pod = actual_scale if actual_scale != 0 else 1
             cc_target: float = tracker.function.concurrency_limit
-
-            max_up_scale = math.ceil(MAX_SCALE_UP_RATE * ready_pod)  # https://github.com/knative/serving/blob/main/pkg/autoscaler/scaling/autoscaler.go#L180
+            # https://github.com/knative/serving/blob/main/pkg/autoscaler/scaling/autoscaler.go#L180
+            max_up_scale = math.ceil(MAX_SCALE_UP_RATE * ready_pod)
             max_down_scale = math.floor(ready_pod / MAX_SCALE_DOWN_RATE)
 
             # * NB: This is plane averaging without bucketing.
             # TODO: Bucketing for exponential decay.
-            panic_cc = sum(concurrencies[-PANIC_WINDOW_SEC:]) / PANIC_WINDOW_SEC
-            stable_cc = sum(concurrencies[-STABLE_WINDOW_SEC:]) / STABLE_WINDOW_SEC
+            panic_cc = compute_observed_cc(concurrencies, PANIC_WINDOW_SEC)
+            stable_cc = compute_observed_cc(concurrencies, STABLE_WINDOW_SEC)
 
             is_over_panic_threshold = panic_cc / ready_pod >= (PANIC_THRESHOLD_PCT / 100)
+            if panic_cc > 0 and actual_scale == 0:
+                # * Let cold function stay panic.
+                is_over_panic_threshold = True
 
             # * Decide mode.
-            if is_over_panic_threshold or is_poked:
+            if is_over_panic_threshold or len(concurrencies) < STABLE_WINDOW_SEC:
                 sim.log.info(f"Start panicking", {'clock': sim.state.clock.now()})
                 self.scalers[func].mode = 'panic'
                 desired_scale = math.ceil(panic_cc / cc_target)
@@ -92,7 +103,7 @@ class Throttler(object):
         return False
 
     def hit(self, request: Request):
-        sim.log.info(f"Handle {request}", {'clock': sim.state.clock.now()})
+        sim.log.info(f"{request} hits!", {'clock': sim.state.clock.now()})
         tracker = self.trackers[request.dest]
         tracker_has_capacity = tracker.breaker.has_slots()
 
@@ -106,7 +117,7 @@ class Throttler(object):
 
         if len(tracker.instances) == 0:
             sim.log.info(f"Cold start occurred on {request.dest}", {'clock': sim.state.clock.now()})
-            sim.state.autoscaler.poke()
+            sim.state.autoscaler.poke(request)
 
         dispatched = self.handle(request)
 
