@@ -1,5 +1,4 @@
 import sys
-
 sys.path.append("..")
 import simulation as sim
 
@@ -17,16 +16,17 @@ INSTANCE_CREATION_DELAY_MILLI = 1000  # TODO: measure CRI engine delay.
 # noinspection PyProtectedMember
 class Node(object):
     def __init__(self, name, num_cores, memory_mib, instance_limit=500):
+        self.cluster: Cluster
+
         self.name = name
         self.num_cores = num_cores
         self.memory_mib = memory_mib
         self.instance_limit = instance_limit
 
         self.cpu_registry = {core: None for core in range(self.num_cores)}
-        self.runqueue = []
         self.instances: List[Instance] = []
+        self.runqueue = []
         self.backlog = []
-        self.sink = []
 
     def run(self):
         for instance in self.instances:
@@ -57,7 +57,8 @@ class Node(object):
         for core, status in self.cpu_registry.items():
             if status == instance:
                 self.cpu_registry[core] = None
-        self.sink.append(request)
+
+        self.cluster.drain(self, request)
         return
 
     def get_available_slots(self):
@@ -112,12 +113,16 @@ class Node(object):
 class Cluster(object):
     def __init__(self, clock: sim.Clock, nodes: List[Node], functions: List[Function], ):
         self.nodes = nodes
-        # self.functions = functions
+        for node in self.nodes:
+            # * Inverse reference.
+            node.cluster = self
+
+        self.scheduler = Scheduler(nodes)
         self.throttler = Throttler(functions)
         self.autoscaler = Autoscaler(functions)
 
-        self.scheduler = Scheduler(nodes)
         self.differences: Dict[str: int] = {func.name: 0 for func in functions}
+        self.sink = []
 
         sim.state = State(self.autoscaler, self.throttler, clock)
 
@@ -147,16 +152,32 @@ class Cluster(object):
                 node.reconcile()
 
     def is_finished(self, total_requests):
-        total_returned = 0
+        return total_requests == len(self.sink)
+
+    def drain(self, node: Node, request: Request):
+        total_desired_instances = 0
+        total_running_instances = 0
+
+        for _, scaler in self.autoscaler.scalers.items():
+            total_desired_instances += scaler.desired_scale
+
         for node in self.nodes:
-            total_returned += len(node.sink)
-        return total_returned == total_requests
+            # ! This is an updated view, which might be different
+            # from that of the throttler (Knative).
+            total_running_instances += len(node.instances)
+
+        # for _, tracker in self.throttler.trackers.items():
+        #     # ! This is the same view as that of the Knative.
+        #     total_running_instances += tracker.get_scale()
+        request.stats['node'] = node.name
+        request.stats['running_instances'] = total_running_instances
+        request.stats['desired_instances'] = total_desired_instances
+        self.sink.append(request)
+        return
 
     def dump(self):
         print("\nResults:")
-        for node in self.nodes:
-            pprint(node.name)
-            pprint(node.sink)
+        pprint(self.sink)
 
     def __repr__(self):
         return "Cluster" + repr(vars(self))

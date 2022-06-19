@@ -29,9 +29,9 @@ def main():
     prev_arrival, next_arrival = 0, 0
     # * Current granularity: 1 ms.
     t = -1
-    # while not cluster.is_finished(num_invocations):
-    #     t += 1
-    for t in range(duration_minute * 60 * 1000 + 1):
+    while not cluster.is_finished(num_invocations):
+        t += 1
+    # for t in range(duration_minute * 60 * 1000 + 1):
         if t == next_arrival and inv < num_invocations:
             # log.info(f"{next_arrival=}", {'clock': clock.now()})
 

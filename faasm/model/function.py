@@ -17,6 +17,8 @@ class Request(object):
         self.end_time = None
         self.is_running = False
 
+        self.stats = {}
+
     def start(self):
         self.start_time = sim.state.clock.now()
         self.is_running = True
@@ -109,7 +111,7 @@ class Instance(object):
                 self.hosted_job = next_request
             # self.serve(next_request)
         return
-    
+
     def finish(self, request: Request):
         request.stop()
         self.queuepoxy.dequeue(request)
