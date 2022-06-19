@@ -45,7 +45,7 @@ class Autoscaler(object):
 
             # * Decide mode.
             if is_over_panic_threshold or is_poked:
-                log.info(f"Start panicking", {'clock': sim.state.clock.now()})
+                sim.log.info(f"Start panicking", {'clock': sim.state.clock.now()})
                 self.scalers[func].mode = 'panic'
                 desired_scale = math.ceil(panic_cc / cc_target)
             else:
@@ -60,10 +60,9 @@ class Autoscaler(object):
 
             if old_scale != desired_scale:
                 if old_scale == 0:
-                    log.info(f"(cold) Desired scale ({func}) {old_scale} -> {desired_scale}", {'clock': sim.state.clock.now()})
+                    sim.log.info(f"(cold) Desired scale ({func}) {old_scale} -> {desired_scale}", {'clock': sim.state.clock.now()})
                 else:
-                    log.info(f"Desired scale ({func}) {old_scale} -> {desired_scale}", {'clock': sim.state.clock.now()})
-
+                    sim.log.info(f"Desired scale ({func}) {old_scale} -> {desired_scale}", {'clock': sim.state.clock.now()})
         return
 
     def __repr__(self):
@@ -83,31 +82,62 @@ class Throttler(object):
         self.trackers: Dict[str, Throttler._Tracker_] = {func.name: self._Tracker_(func) for func in functions}
 
     def handle(self, request: Request):
-        log.info(f"Handle {request.dest}", {'clock': sim.state.clock.now()})
+        # * Only try the instances of the destination.
         tracker = self.trackers[request.dest]
-        tracker.breaker.enqueue(request)
+        for instance in tracker.instances:
+            reserved = instance.reserve(request)
+            if reserved:
+                sim.log.info(f"Dispatched {request}", {'clock': sim.state.clock.now()})
+                return True
+        return False
+
+    def hit(self, request: Request):
+        sim.log.info(f"Handle {request}", {'clock': sim.state.clock.now()})
+        tracker = self.trackers[request.dest]
+        tracker_has_capacity = tracker.breaker.has_slots()
+
+        if tracker_has_capacity:
+            tracker.breaker.enqueue(request)
+        else:
+            # * Overflow to the centralised queue.
+            self.breaker.enqueue(request)
+
         tracker.inc_concurrency()
 
         if len(tracker.instances) == 0:
-            log.info(f"Cold start occurred on {request.dest}", {'clock': sim.state.clock.now()})
+            sim.log.info(f"Cold start occurred on {request.dest}", {'clock': sim.state.clock.now()})
             sim.state.autoscaler.poke()
 
-        processed = False
-        for instance in tracker.instances:
-            # sim.log.info(f"{instance.func} has {tracker.get_scale()} instances", {'clock': sim.state.clock.now()})
-            processed = instance.reserve(request)
+        dispatched = self.handle(request)
 
-        if processed:
+        if dispatched:
             tracker.dec_concurrency()
-            tracker.breaker.dequeue(request)
+            if tracker_has_capacity:
+                tracker.breaker.dequeue(request)
+            else:
+                self.breaker.dequeue(request)
         else:
-            log.warn(f"No slots! Request to {request.dest} queued.", {'clock': sim.state.clock.now()})
+            sim.log.warn(f"No slots! Queued {request}.", {'clock': sim.state.clock.now()})
 
         return
 
     def dispatch(self):
-        # TODO: constantly trying to dispatch accumulated requests in all the trackers.
-        pass
+        # * Constantly trying to dispatch accumulated requests in both the central queue and the tracker queues.
+        for request in self.breaker.first():
+            if request is not None:
+                # sim.log.info(f"Try to dispatch {request}", {'clock': sim.state.clock.now()})
+                dispatched = self.handle(request)
+                if dispatched:
+                    self.breaker.dequeue(request)
+
+        for _, tracker in self.trackers.items():
+            for request in tracker.breaker.first():
+                if request is not None:
+                    # sim.log.info(f"Try to dispatch {request}", {'clock': sim.state.clock.now()})
+                    dispatched = self.handle(request)
+                    if dispatched:
+                        tracker.breaker.dequeue(request)
+        return
 
     def __repr__(self):
         return "Throttler" + repr(vars(self))
@@ -129,7 +159,7 @@ class Throttler(object):
                 self.concurrencies[0] = curr
             else:
                 self.concurrencies.append(curr)
-            log.info(f"Concurrency={curr}", {'clock': sim.state.clock.now()})
+            sim.log.info(f"Concurrency={curr}", {'clock': sim.state.clock.now()})
             return
 
         def dec_concurrency(self):
@@ -139,11 +169,8 @@ class Throttler(object):
             return "_Tracker_" + repr(vars(self))
 
 
-class StateMachine(object):
+class State(object):
     def __init__(self, autoscaler: Autoscaler, throttler: Throttler, clock: sim.Clock):
         self.autoscaler: Autoscaler = autoscaler
         self.throttler: Throttler = throttler
         self.clock = clock
-        # self.instance_engine = instance_engine
-
-# state_machine: StateMachine = None
