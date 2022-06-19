@@ -6,7 +6,7 @@ from simulation import *
 
 
 def main():
-    rps = 1
+    rps = 10
     runtime_milli = 1e3 # 1s
     memory_mib = 1000
     iat_milli = int(1e3 / rps)

@@ -27,7 +27,7 @@ class Function(object):
         self.instances = []
 
     def __repr__(self):
-        return "Funciton" + repr(vars(self))
+        return "Function" + repr(vars(self))
 
     def get_slots(self):
         available_slots = 0
@@ -55,7 +55,7 @@ class Instance(object):
 
     def reserve(self, request: Request):
         if not self.breaker.has_slots():
-            log.info("No free slots")
+            # log.info("No free slots")
             return False
         else:
             if self.idle:
@@ -94,7 +94,7 @@ class Breaker(object):
             log.fatal(f"{self.owner} Breaker overload")
 
     def dequeue(self, request: Request):
-        log.info(f"Dequeue {request}")
+        log.info(f"Dequeue {request.dest}")
         self.queue.remove(request)
 
     def __repr__(self):

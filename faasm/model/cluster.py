@@ -10,7 +10,7 @@ from typing import *
 
 CRI_ENGINE_PULLING = int(1000 / 100)  # * kubelet QPS of our the 500-node cluster.
 INSTANCE_SIZE_MIB = 400  # TODO: size of firecracker.
-INSTANCE_CREATION_DELAY_MILLI = 500  # TODO: measure CRI engine delay.
+INSTANCE_CREATION_DELAY_MILLI = 1000  # TODO: measure CRI engine delay.
 
 
 class Node(object):
@@ -46,6 +46,7 @@ class Node(object):
         self.backlog = sorted(self.backlog, key=lambda r: r['time'])
         request = self.backlog[0]  # * Only handle the first.
 
+        # TODO: Distinguish between cold start and normal start.
         if sim.state.clock.now() - request['time'] < INSTANCE_CREATION_DELAY_MILLI:
             # * CRI engine delay has not been fulfilled.
             return
