@@ -6,9 +6,10 @@ import simulation as sim
 
 
 class Request(object):
-    def __init__(self, index, timestamp, dest, duration, memory):
+    def __init__(self, index, timestamp, rps, dest, duration, memory):
         self.index = index
         self.arrival = timestamp
+        self.rps = rps
         self.dest = dest
         self.duration = duration
         self.memory = memory

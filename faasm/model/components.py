@@ -185,3 +185,4 @@ class State(object):
         self.autoscaler: Autoscaler = autoscaler
         self.throttler: Throttler = throttler
         self.clock = clock
+        self.rps = 0

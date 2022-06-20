@@ -13,14 +13,16 @@ from pprint import pprint
 
 CRI_ENGINE_PULLING = int(1000 / 100)  # * kubelet QPS of our the 500-node cluster.
 INSTANCE_SIZE_MIB = 400  # TODO: size of firecracker.
-INSTANCE_CREATION_DELAY_MILLI = 1000  # TODO: measure CRI engine delay.
+COLD_INSTANCE_CREATION_DELAY_MILLI = 2  # TODO: measure CRI engine delay.
+WARM_INSTANCE_CREATION_DELAY_MILLI = 1
 
 INSTANCE_GRACE_PERIOD_SEC = 40  # Default K8s grace period (30s) + empirical delay (10s).
 
 MONITORING_PERIOD_MILLI = 1000
+MEMORY_OVERHEAD_MIB = 50
+MEMORY_USAGE_OFFSET = 5
 
 
-# noinspection PyProtectedMember
 class Node(object):
     def __init__(self, name, num_cores, memory_mib, instance_limit=500):
         self.cluster: Cluster
@@ -44,16 +46,16 @@ class Node(object):
         return self.instance_limit - len(self.instances)
 
     def get_utilisations(self):
-        occupency = 0
+        occupancy = 0
         for _, status in self.cpu_registry.items():
             if status is not None:
-                occupency += 1
-        cpu_utilisation = occupency / self.num_cores * 100
+                occupancy += 1
+        cpu_utilisation = occupancy / self.num_cores * 100
 
         memory_used = 0
         for instance in self.instances:
             if instance.hosted_job is not None:
-                memory_used += instance.hosted_job.memory
+                memory_used += instance.hosted_job.memory + MEMORY_OVERHEAD_MIB
         memory_usage = memory_used / self.memory_mib * 100
         return cpu_utilisation, memory_usage
 
@@ -108,6 +110,12 @@ class Node(object):
         return remaining
 
     def reconcile(self):
+        def is_cold_start(func):
+            for instance in self.instances:
+                if instance.func == func:
+                    return False
+            return True
+
         if len(self.bindings) == 0: return
         # * Order by request time (FCFS).
         self.bindings = sorted(self.bindings, key=lambda r: r['time'])
@@ -119,7 +127,10 @@ class Node(object):
             """Creating new instances."""
             # TODO: Distinguish between cold start and normal start.
             # TODO: Also, add the burst blocking delay.
-            if sim.state.clock.now() - binding['time'] < INSTANCE_CREATION_DELAY_MILLI:
+
+            cri_delay = COLD_INSTANCE_CREATION_DELAY_MILLI if is_cold_start(binding['func']) else WARM_INSTANCE_CREATION_DELAY_MILLI
+
+            if sim.state.clock.now() - binding['time'] < cri_delay:
                 # * CRI engine delay has not been fulfilled.
                 return
 
@@ -137,7 +148,7 @@ class Node(object):
 
             sim.log.info(f"Spawn {new_instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
 
-        elif binding['quantity'] > 0:
+        elif binding['quantity'] < 0:
             """Taking down instances."""
             terminating = []
             deadline = sim.state.clock.now() + INSTANCE_GRACE_PERIOD_SEC * 1000
@@ -195,11 +206,21 @@ class Cluster(object):
         sim.state = State(self.autoscaler, self.throttler, clock)
 
     def run(self):
+        now = sim.state.clock.now()
+
+        if now % AUTOSCALING_PERIOD_MILLI == 0:
+            '''Autoscaling round every 2s.'''
+            self.autoscaler.evaluate()
+
+        if now % CRI_ENGINE_PULLING == 0:
+            self.reconcile()
+
         for node in self.nodes:
             node.run()
+
         self.throttler.dispatch()
 
-        if sim.state.clock.now() % MONITORING_PERIOD_MILLI == 0:
+        if now % MONITORING_PERIOD_MILLI == 0:
             self.monitor()
         return
 
@@ -247,12 +268,13 @@ class Cluster(object):
                 active_cpu_avg.append(cpu)
 
         record = {
+            'rps': sim.state.rps,
             'timestamp': sim.state.clock.now(),
             'actual_scale': total_actual_scale,
             'desired_scale': total_desired_scale,
             'running_instances': total_running_instances,
-            'worker_cpu_avg': sum(cpu_utilisations)/len(cpu_utilisations) if len(cpu_utilisations) > 0 else 0,
-            'worker_mem_avg': sum(mem_utilisations)/len(mem_utilisations) if len(mem_utilisations) > 0 else 0,
+            'worker_cpu_avg': sum(cpu_utilisations)/len(cpu_utilisations),
+            'worker_mem_avg': sum(mem_utilisations)/len(mem_utilisations) + MEMORY_USAGE_OFFSET,
             'active_worker_cpu_avg': sum(active_cpu_avg)/len(active_cpu_avg) if len(active_cpu_avg) > 0 else 0,
         }
         self.trace.append(record)
@@ -261,6 +283,7 @@ class Cluster(object):
     def drain(self, node: Node, request: Request):
         record = {
             'index': request.index,
+            'rps': request.rps,
             'arrival': request.arrival,
             'start_time': request.start_time,
             'end_time': request.end_time,
