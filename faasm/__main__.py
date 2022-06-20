@@ -22,11 +22,11 @@ def run_rps_mode():
     cluster = Cluster(clock, nodes, functions)
 
     rps_start = 1
-    rps_end = 20
+    rps_end = 18
     rps_step = 1
     rps_slot_sec = 60
-    invocation_duration_milli = (rps_step - rps_start + 1) * rps_slot_sec * 1000
 
+    """"Generating requests."""
     inv_index = 0
     for rps in range(rps_start, rps_end + 1, rps_step):
         print('RPS=', rps)
@@ -45,10 +45,10 @@ def run_rps_mode():
                     memory=memory_mib
                 )
                 cluster.accept(request)
-                sim.log.info(f"Invocation {inv_index}", {'clock': clock.now()})
 
                 next_arrival += iat_milli
                 inv_index += 1
+                sim.log.info(f"Invocation {inv_index}", {'clock': clock.now()})
 
             cluster.run()
 
@@ -56,6 +56,7 @@ def run_rps_mode():
                 sim.log.info('Clock', {'clock': clock.now()})
             clock.inc(1)
 
+    """"Finishing the remaining requests."""
     while not cluster.is_finished(inv_index):
         cluster.run()
         clock.inc(1)

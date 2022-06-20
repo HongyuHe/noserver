@@ -95,6 +95,7 @@ class Throttler(object):
     def handle(self, request: Request):
         # * Only try the instances of the destination.
         tracker = self.trackers[request.dest]
+        """First-available LB."""
         for instance in tracker.instances:
             reserved = instance.reserve(request)
             if reserved:

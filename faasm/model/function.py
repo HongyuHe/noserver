@@ -1,9 +1,8 @@
 import sys
-
 sys.path.append("..")
-
 import simulation as sim
 
+import random
 
 class Request(object):
     def __init__(self, index, timestamp, rps, dest, duration, memory):
@@ -65,7 +64,7 @@ class Instance(object):
         self.terminating = False
         self.deadline = None
 
-        self.capacity = 10 + 1  # self.concurrency_limit
+        self.capacity = 1  # self.concurrency_limit
         self.queuepoxy = Breaker(f"Instance {self.func}", self.capacity)
 
     def serve(self, request: Request):
@@ -109,18 +108,18 @@ class Instance(object):
             next_request = next(self.queuepoxy.first())
             if next_request is not None:
                 self.idle = False
-                self.hosted_job = next_request
-            # self.serve(next_request)
+                # self.hosted_job = next_request
+                self.serve(next_request)
         return
 
     def finish(self, request: Request):
-        sim.log.info(f"Finished {request}", {'clock': sim.state.clock.now()})
-
         request.stop()
         self.queuepoxy.dequeue(request)
         self.node.yield_core(self, request)
         self.hosted_job = None
         self.idle = True
+
+        sim.log.info(f"Finished {request}", {'clock': sim.state.clock.now()})
         return
 
     def __repr__(self):
@@ -139,6 +138,12 @@ class Breaker(object):
     def first(self):
         if len(self.queue) > 0:
             yield self.queue[0]
+        else:
+            yield None
+
+    def rand(self):
+        if len(self.queue) > 0:
+            yield self.queue[random.randint(0, len(self.queue)-1)]
         else:
             yield None
 

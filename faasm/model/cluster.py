@@ -13,8 +13,8 @@ from pprint import pprint
 
 CRI_ENGINE_PULLING = int(1000 / 100)  # * kubelet QPS of our the 500-node cluster.
 INSTANCE_SIZE_MIB = 400  # TODO: size of firecracker.
-COLD_INSTANCE_CREATION_DELAY_MILLI = 2  # TODO: measure CRI engine delay.
-WARM_INSTANCE_CREATION_DELAY_MILLI = 1
+COLD_INSTANCE_CREATION_DELAY_MILLI = 0  # TODO: measure CRI engine delay.
+WARM_INSTANCE_CREATION_DELAY_MILLI = 0
 
 INSTANCE_GRACE_PERIOD_SEC = 40  # Default K8s grace period (30s) + empirical delay (10s).
 
