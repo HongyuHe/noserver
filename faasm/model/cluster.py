@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append("..")
 import simulation as sim
 
@@ -6,11 +7,14 @@ from .components import *
 from .function import Function, Instance, Request, Breaker
 
 from typing import *
+from collections import OrderedDict
 from pprint import pprint
 
 CRI_ENGINE_PULLING = int(1000 / 100)  # * kubelet QPS of our the 500-node cluster.
 INSTANCE_SIZE_MIB = 400  # TODO: size of firecracker.
 INSTANCE_CREATION_DELAY_MILLI = 1000  # TODO: measure CRI engine delay.
+
+INSTANCE_GRACE_PERIOD_SEC = 40  # Default K8s grace period (30s) + empirical delay (10s).
 
 
 # noinspection PyProtectedMember
@@ -23,10 +27,10 @@ class Node(object):
         self.memory_mib = memory_mib
         self.instance_limit = instance_limit
 
-        self.cpu_registry = {core: None for core in range(self.num_cores)}
+        self.cpu_registry = OrderedDict({core: None for core in range(self.num_cores)})
         self.instances: List[Instance] = []
         self.runqueue = []
-        self.backlog = []
+        self.bindings = []
 
     def run(self):
         for instance in self.instances:
@@ -63,47 +67,93 @@ class Node(object):
 
     def get_available_slots(self):
         return self.instance_limit - len(self.instances)
-        # min(
-        #     self.instance_limit - len(self.instances),
-        #     # # TODO: Estimate based on the actual requests.
-        #     # (self.memory_mib - len(self.instances)*INSTANCE_SIZE_MIB) / INSTANCE_SIZE_MIB,
-        # )
 
-    def accept(self, func, diff):
-        self.backlog.append({
+    def bind(self, func, num):
+        self.bindings.append({
             'time': sim.state.clock.now(),
             'func': func,
-            'quantity': diff,
+            'quantity': num,
         })
-        # sim.log.info(f"{self.backlog=}")
         return
 
+    def kill(self, func, num):
+        total = 0
+        for instance in self.instances:
+            # NOTE: Killing instances is NOT balanced across workers for now.
+            if instance.func == func:  # and instance.idle:
+                total += 1
+
+        remaining = max(num - total, 0)
+        self.bind(
+            func,
+            num if remaining == 0 else total,
+        )
+        return remaining
+
     def reconcile(self):
-        if len(self.backlog) == 0: return
+        if len(self.bindings) == 0: return
         # * Order by request time (FCFS).
-        self.backlog = sorted(self.backlog, key=lambda r: r['time'])
-        request = self.backlog[0]  # * Only handle the first.
+        self.bindings = sorted(self.bindings, key=lambda r: r['time'])
+        binding = self.bindings[0]  # * Only handle the first.
 
-        # TODO: Distinguish between cold start and normal start.
-        # TODO: Also, add the burst blocking delay.
-        if sim.state.clock.now() - request['time'] < INSTANCE_CREATION_DELAY_MILLI:
-            # * CRI engine delay has not been fulfilled.
-            return
+        tracker: Throttler._Tracker_ = sim.state.throttler.trackers[binding['func']]
 
-        new_instance = Instance(func=request['func'], node=self)
-        self.instances.append(new_instance)
-        self.backlog.remove(request)
-        # * Assume one engine can only create one pod at a time.
-        if request['quantity'] > 1:
-            request['quantity'] -= 1
-            self.backlog.append(request)
+        if binding['quantity'] > 0:
+            """Creating new instances."""
+            # TODO: Distinguish between cold start and normal start.
+            # TODO: Also, add the burst blocking delay.
+            if sim.state.clock.now() - binding['time'] < INSTANCE_CREATION_DELAY_MILLI:
+                # * CRI engine delay has not been fulfilled.
+                return
 
-        # TODO: Add discovery latency
-        tracker: Throttler._Tracker_ = sim.state.throttler.trackers[request['func']]
-        # TODO: Unify instances to one place.
-        tracker.instances.append(new_instance)
+            self.bindings.remove(binding)  # * Dequeue binding request.
+            new_instance = Instance(func=binding['func'], node=self)
+            self.instances.append(new_instance)
 
-        sim.log.info(f"Spawn {new_instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
+            # * Assume one engine can only create one pod at a time.
+            if binding['quantity'] > 1:
+                binding['quantity'] -= 1
+                self.bindings.append(binding)  # * Add the remaining back.
+
+            # TODO: Add discovery latency
+            tracker.instances.append(new_instance)
+
+            sim.log.info(f"Spawn {new_instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
+
+        elif binding['quantity'] > 0:
+            """Taking down instances."""
+            terminating = []
+            deadline = sim.state.clock.now() + INSTANCE_GRACE_PERIOD_SEC * 1000
+            updated_instance_list = self.instances
+            for instance in self.instances:
+                # * Garbage-collect all expired instances.
+                if instance.terminating and instance.deadline == sim.state.clock.now():
+                    updated_instance_list.remove(instance)
+                    tracker.instances.remove(instance)
+
+                # * Terminate required # of instances.
+                if instance.idle and not instance.terminating:
+                    if len(terminating) < binding['quantity']:
+                        instance.terminating = True
+                        instance.deadline = deadline
+                        terminating.append(instance)
+
+            self.instances = updated_instance_list
+
+            # * Manually sync throttler's view.
+            # They should share the same set of instances but just in case.
+            for instance in terminating:
+                throttler_instance = tracker.instances[tracker.instances.index(instance)]
+                throttler_instance.terminating = True
+                throttler_instance.deadline = deadline
+
+            self.bindings.remove(binding)  # * Dequeue binding request.
+            remaining = binding['quantity'] - len(terminating)
+            if remaining > 0:
+                binding['quantity'] = remaining
+                self.bindings.append(binding)  # * Add the remaining back.
+        else:
+            raise RuntimeError("Zero binding")
         return
 
     def __repr__(self):
@@ -169,15 +219,29 @@ class Cluster(object):
         # for _, tracker in self.throttler.trackers.items():
         #     # ! This is the same view as that of the Knative.
         #     total_running_instances += tracker.get_scale()
-        request.stats['node'] = node.name
-        request.stats['running_instances'] = total_running_instances
-        request.stats['desired_instances'] = total_desired_instances
-        self.sink.append(request)
+        record = {
+            'index': request.index,
+            'arrival': request.arrival,
+            'start_time': request.start_time,
+            'end_time': request.end_time,
+            'latency': request.end_time - request.arrival - request.duration,
+            'running_instances': total_running_instances,
+            'desired_instances': total_desired_instances,
+            'function': request.dest,
+            'node': node.name,
+            'duration': request.duration,
+            'memory': request.memory,
+        }
+
+        self.sink.append(record)
         return
 
     def dump(self):
         print("\nResults:")
-        pprint(self.sink)
+        self.sink.sort(key=lambda r: r['index'])
+        for record in self.sink:
+            print(record)
+        # pprint(self.sink, compact=True, width=190)
 
     def __repr__(self):
         return "Cluster" + repr(vars(self))
@@ -191,24 +255,37 @@ class Scheduler(object):
     def schedule(self, func, num):
         # TODO: bin-packing (best-fit) -- currently first available.
         if num > 0:
-            """Scaling up"""
-            sim.log.info(f"Schedule {num} instances of {func}", {'clock': sim.state.clock.now()})
+            sim.log.info(f"Bind {num} instances of {func}", {'clock': sim.state.clock.now()})
+            """
+            Bind new instances to nodes
+            (! Potential deadlock)
+            """
             all_scheduled = False
             while not all_scheduled:
                 for node in self.nodes:
                     slots = node.get_available_slots()
                     can_take = min(slots, num)
                     if can_take > 0:
-                        node.accept(func, can_take)
+                        node.bind(func, can_take)
                     if can_take == num:
                         all_scheduled = True
                         break
                     else:
                         num -= can_take
         else:
-            # TODO: Scaling down
-            sim.log.info("[Unimplemented] Scaling down")
-
+            sim.log.info(f"Destroy {num} instances of {func}", {'clock': sim.state.clock.now()})
+            """
+            Destroy instances
+            (! Potential deadlock)
+            """
+            all_scheduled = False
+            while not all_scheduled:
+                for node in self.nodes:
+                    remaining = node.kill(func, num)
+                    if remaining == 0:
+                        all_scheduled = True
+                    else:
+                        num = remaining
         return
 
     def __repr__(self):

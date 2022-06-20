@@ -6,6 +6,9 @@ from simulation import *
 
 
 def main():
+    """
+    RPS Mode
+    """
     rps = 1
     runtime_milli = 1e3  # 1s
     memory_mib = 1000
@@ -13,7 +16,7 @@ def main():
     duration_minute = 1
     num_invocations = int(np.ceil(duration_minute * 60 * 1e3 / iat_milli))
 
-    num_workers = 2
+    num_workers = 1
     num_functions = 2
 
     clock = Clock()
@@ -60,6 +63,7 @@ def main():
 
         if not t % 10000:
             log.info('', {'clock': clock.now()})
+
         clock.inc(1)
 
     cluster.dump()

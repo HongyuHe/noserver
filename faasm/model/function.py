@@ -17,8 +17,6 @@ class Request(object):
         self.end_time = None
         self.is_running = False
 
-        self.stats = {}
-
     def start(self):
         self.start_time = sim.state.clock.now()
         self.is_running = True
@@ -63,6 +61,9 @@ class Instance(object):
         self.hosted_job = None
         self.start_time = sim.state.clock.now()
 
+        self.terminating = False
+        self.deadline = None
+
         self.capacity = 10 + 1  # self.concurrency_limit
         self.queuepoxy = Breaker(f"Instance {self.func}", self.capacity)
 
@@ -83,7 +84,7 @@ class Instance(object):
             # sim.log.info("No free slots")
             return False
         else:
-            if self.idle:
+            if self.idle and not self.terminating:
                 self.idle = False
                 self.serve(request)
             else:
@@ -101,9 +102,8 @@ class Instance(object):
                 residual = request.run()
                 if residual <= 0:
                     self.finish(request)
-                    sim.log.info(f"Finished {request}", {'clock': sim.state.clock.now()})
 
-        if self.idle:
+        if self.idle and not self.terminating:
             # * Load the next job (None if there the queue is empty).
             next_request = next(self.queuepoxy.first())
             if next_request is not None:
@@ -113,6 +113,8 @@ class Instance(object):
         return
 
     def finish(self, request: Request):
+        sim.log.info(f"Finished {request}", {'clock': sim.state.clock.now()})
+
         request.stop()
         self.queuepoxy.dequeue(request)
         self.node.yield_core(self, request)
