@@ -1,3 +1,4 @@
+import csv
 import sys
 
 sys.path.append("..")
@@ -15,6 +16,8 @@ INSTANCE_SIZE_MIB = 400  # TODO: size of firecracker.
 INSTANCE_CREATION_DELAY_MILLI = 1000  # TODO: measure CRI engine delay.
 
 INSTANCE_GRACE_PERIOD_SEC = 40  # Default K8s grace period (30s) + empirical delay (10s).
+
+MONITORING_PERIOD_MILLI = 1000
 
 
 # noinspection PyProtectedMember
@@ -36,6 +39,23 @@ class Node(object):
         for instance in self.instances:
             instance.run()
         return
+
+    def get_available_slots(self):
+        return self.instance_limit - len(self.instances)
+
+    def get_utilisations(self):
+        occupency = 0
+        for _, status in self.cpu_registry.items():
+            if status is not None:
+                occupency += 1
+        cpu_utilisation = occupency / self.num_cores * 100
+
+        memory_used = 0
+        for instance in self.instances:
+            if instance.hosted_job is not None:
+                memory_used += instance.hosted_job.memory
+        memory_usage = memory_used / self.memory_mib * 100
+        return cpu_utilisation, memory_usage
 
     def book_core(self, instance: Instance):
         if instance in self.runqueue:
@@ -64,9 +84,6 @@ class Node(object):
 
         self.cluster.drain(self, request)
         return
-
-    def get_available_slots(self):
-        return self.instance_limit - len(self.instances)
 
     def bind(self, func, num):
         self.bindings.append({
@@ -173,6 +190,7 @@ class Cluster(object):
 
         self.differences: Dict[str: int] = {func.name: 0 for func in functions}
         self.sink = []
+        self.trace = []
 
         sim.state = State(self.autoscaler, self.throttler, clock)
 
@@ -180,6 +198,9 @@ class Cluster(object):
         for node in self.nodes:
             node.run()
         self.throttler.dispatch()
+
+        if sim.state.clock.now() % MONITORING_PERIOD_MILLI == 0:
+            self.monitor()
         return
 
     def accept(self, request: Request):
@@ -204,29 +225,46 @@ class Cluster(object):
     def is_finished(self, total_requests):
         return total_requests == len(self.sink)
 
-    def drain(self, node: Node, request: Request):
-        total_desired_instances = 0
+    def monitor(self):
+        total_desired_scale = 0
+        total_actual_scale = 0
         total_running_instances = 0
-
         for _, scaler in self.autoscaler.scalers.items():
-            total_desired_instances += scaler.desired_scale
+            """This is Knative's view"""
+            total_desired_scale += scaler.desired_scale
+            total_actual_scale += scaler.actual_scale
 
+        cpu_utilisations = []
+        mem_utilisations = []
+        active_cpu_avg = []
         for node in self.nodes:
-            # ! This is an updated view, which might be different
-            # from that of the throttler (Knative).
+            """This is K8s's view"""
             total_running_instances += len(node.instances)
+            cpu, mem = node.get_utilisations()
+            cpu_utilisations.append(cpu)
+            mem_utilisations.append(mem)
+            if cpu > 4:
+                active_cpu_avg.append(cpu)
 
-        # for _, tracker in self.throttler.trackers.items():
-        #     # ! This is the same view as that of the Knative.
-        #     total_running_instances += tracker.get_scale()
+        record = {
+            'timestamp': sim.state.clock.now(),
+            'actual_scale': total_actual_scale,
+            'desired_scale': total_desired_scale,
+            'running_instances': total_running_instances,
+            'worker_cpu_avg': sum(cpu_utilisations)/len(cpu_utilisations) if len(cpu_utilisations) > 0 else 0,
+            'worker_mem_avg': sum(mem_utilisations)/len(mem_utilisations) if len(mem_utilisations) > 0 else 0,
+            'active_worker_cpu_avg': sum(active_cpu_avg)/len(active_cpu_avg) if len(active_cpu_avg) > 0 else 0,
+        }
+        self.trace.append(record)
+        return
+
+    def drain(self, node: Node, request: Request):
         record = {
             'index': request.index,
             'arrival': request.arrival,
             'start_time': request.start_time,
             'end_time': request.end_time,
             'latency': request.end_time - request.arrival - request.duration,
-            'running_instances': total_running_instances,
-            'desired_instances': total_desired_instances,
             'function': request.dest,
             'node': node.name,
             'duration': request.duration,
@@ -237,10 +275,22 @@ class Cluster(object):
         return
 
     def dump(self):
-        print("\nResults:")
+        # print("\nResults:")
         self.sink.sort(key=lambda r: r['index'])
-        for record in self.sink:
-            print(record)
+        # for record in self.sink:
+        #     print(record)
+
+        with open(f'data/results/cluster.csv', "w", newline="") as f:
+            headers = self.trace[0].keys()
+            cw = csv.DictWriter(f, headers, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            cw.writeheader()
+            cw.writerows(self.trace)
+
+        with open(f'data/results/requests.csv', "w", newline="") as f:
+            headers = self.sink[0].keys()
+            cw = csv.DictWriter(f, headers, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            cw.writeheader()
+            cw.writerows(self.sink)
         # pprint(self.sink, compact=True, width=190)
 
     def __repr__(self):
