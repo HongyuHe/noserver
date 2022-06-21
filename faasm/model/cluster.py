@@ -183,6 +183,7 @@ class Node(object):
                             instance.terminating = True
                             instance.deadline = deadline
                             terminating.append(instance)
+                            sim.log.info(f"Terminate {instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
 
                 self.instances = updated_instance_list
 

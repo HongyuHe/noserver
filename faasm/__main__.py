@@ -1,10 +1,8 @@
 """Console script."""
-import sys
-
-import numpy as np
-
 from model.cluster import *
 import simulation as sim
+
+import math
 
 
 def run_rps_mode():
@@ -42,6 +40,7 @@ def run_rps_mode():
                     timestamp=clock.now(),
                     rps=rps,
                     dest=functions[func_idx].name,
+                    # * Execution time is only fully fulfilled after the server has saturated.
                     duration=runtime_milli if rps > num_cores else random.randint(runtime_milli-100, runtime_milli),
                     memory=memory_mib
                 )
@@ -72,7 +71,7 @@ def run_test_mode():
     memory_mib = 170
     iat_milli = int(1e3 / rps)
     duration_minute = 1
-    num_invocations = int(np.ceil(duration_minute * 60 * 1e3 / iat_milli))
+    num_invocations = int(math.ceil(duration_minute * 60 * 1e3 / iat_milli))
 
     num_workers = 1
     num_functions = 2

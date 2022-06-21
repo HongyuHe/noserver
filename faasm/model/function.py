@@ -3,6 +3,8 @@ sys.path.append("..")
 import simulation as sim
 
 import random
+random.seed(42)
+
 
 class Request(object):
     def __init__(self, index, timestamp, rps, dest, duration, memory):
@@ -64,7 +66,7 @@ class Instance(object):
         self.terminating = False
         self.deadline = None
 
-        self.capacity = 2  # self.concurrency_limit
+        self.capacity = 1  # self.concurrency_limit
         self.queuepoxy = Breaker(f"Instance {self.func}", self.capacity)
 
     def serve(self, request: Request):
