@@ -130,75 +130,76 @@ class Node(object):
         # * Order by request time (FCFS).
         self.bindings = sorted(self.bindings, key=lambda r: r['time'])
         binding = self.bindings[0]  # * Only handle the first.
-        # for binding in self.bindings:
-        tracker: Throttler._Tracker_ = sim.state.throttler.trackers[binding['func']]
+        for binding in self.bindings:
+            tracker: Throttler._Tracker_ = sim.state.throttler.trackers[binding['func']]
 
-        if binding['quantity'] > 0:
-            """Creating new instances."""
-            # TODO: Distinguish between cold start and normal start.
-            # TODO: Also, add the burst blocking delay.
+            if binding['quantity'] > 0:
+                """Creating new instances."""
+                # TODO: Distinguish between cold start and normal start.
+                # TODO: Also, add the burst blocking delay.
 
-            cri_delay = COLD_INSTANCE_CREATION_DELAY_MILLI if is_cold_start(binding['func']) else WARM_INSTANCE_CREATION_DELAY_MILLI
+                cri_delay = COLD_INSTANCE_CREATION_DELAY_MILLI if is_cold_start(binding['func']) else WARM_INSTANCE_CREATION_DELAY_MILLI
 
-            if sim.state.clock.now() - binding['time'] < cri_delay:
-                # * CRI engine delay has not been fulfilled.
-                return
+                if sim.state.clock.now() - binding['time'] < cri_delay:
+                    # * CRI engine delay has not been fulfilled.
+                    return
 
-            self.bindings.remove(binding)  # * Dequeue binding request.
+                self.bindings.remove(binding)  # * Dequeue binding request.
 
-            # # TODO: How many instances can containerd creates at a time?
-            # * Assume one engine can only create one pod at a time.
-            new_instance = Instance(func=binding['func'], node=self)
-            if binding['quantity'] > 1:
-                binding['quantity'] -= 1
-                self.bindings.append(binding)  # * Add the remaining back.
+                # # # TODO: How many instances can containerd creates at a time?
+                # # * Assume one engine can only create one pod at a time.
+                # new_instance = Instance(func=binding['func'], node=self)
+                # if binding['quantity'] > 1:
+                #     binding['quantity'] -= 1
+                #     self.bindings.append(binding)  # * Add the remaining back.
+                #
+                # self.instances.append(new_instance)
+                # # TODO: Add discovery latency
+                # tracker.instances.append(new_instance)
+                # sim.log.info(f"Spawn {new_instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
 
-            self.instances.append(new_instance)
-            # TODO: Add discovery latency
-            tracker.instances.append(new_instance)
+                # TODO: How many instances can containerd creates at a time?
+                for i in range(binding['quantity']):
+                    new_instance = Instance(func=binding['func'], node=self)
+                    self.instances.append(new_instance)
+                    # TODO: Add discovery latency
+                    tracker.instances.append(new_instance)
+                    sim.log.info(f"Spawn {new_instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
 
-            # for i in range(binding['quantity']):
-            #     new_instance = Instance(func=binding['func'], node=self)
-            #     self.instances.append(new_instance)
-            #     # TODO: Add discovery latency
-            #     tracker.instances.append(new_instance)
-            #
-            sim.log.info(f"Spawn {new_instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
+            elif binding['quantity'] < 0:
+                """Taking down instances."""
+                terminating = []
+                deadline = sim.state.clock.now() + INSTANCE_GRACE_PERIOD_SEC * 1000
+                updated_instance_list = self.instances
+                for instance in self.instances:
+                    # * Garbage-collect all expired instances.
+                    if instance.terminating and instance.deadline == sim.state.clock.now():
+                        updated_instance_list.remove(instance)
+                        tracker.instances.remove(instance)
 
-        elif binding['quantity'] < 0:
-            """Taking down instances."""
-            terminating = []
-            deadline = sim.state.clock.now() + INSTANCE_GRACE_PERIOD_SEC * 1000
-            updated_instance_list = self.instances
-            for instance in self.instances:
-                # * Garbage-collect all expired instances.
-                if instance.terminating and instance.deadline == sim.state.clock.now():
-                    updated_instance_list.remove(instance)
-                    tracker.instances.remove(instance)
+                    # * Terminate required # of instances.
+                    if instance.idle and not instance.terminating:
+                        if len(terminating) < binding['quantity']:
+                            instance.terminating = True
+                            instance.deadline = deadline
+                            terminating.append(instance)
 
-                # * Terminate required # of instances.
-                if instance.idle and not instance.terminating:
-                    if len(terminating) < binding['quantity']:
-                        instance.terminating = True
-                        instance.deadline = deadline
-                        terminating.append(instance)
+                self.instances = updated_instance_list
 
-            self.instances = updated_instance_list
+                # * Manually sync throttler's view.
+                # They should share the same set of instances but just in case.
+                for instance in terminating:
+                    throttler_instance = tracker.instances[tracker.instances.index(instance)]
+                    throttler_instance.terminating = True
+                    throttler_instance.deadline = deadline
 
-            # * Manually sync throttler's view.
-            # They should share the same set of instances but just in case.
-            for instance in terminating:
-                throttler_instance = tracker.instances[tracker.instances.index(instance)]
-                throttler_instance.terminating = True
-                throttler_instance.deadline = deadline
-
-            self.bindings.remove(binding)  # * Dequeue binding request.
-            remaining = binding['quantity'] - len(terminating)
-            if remaining > 0:
-                binding['quantity'] = remaining
-                self.bindings.append(binding)  # * Add the remaining back.
-        else:
-            raise RuntimeError("Zero binding")
+                self.bindings.remove(binding)  # * Dequeue binding request.
+                remaining = binding['quantity'] - len(terminating)
+                if remaining > 0:
+                    binding['quantity'] = remaining
+                    self.bindings.append(binding)  # * Add the remaining back.
+            else:
+                raise RuntimeError("Zero binding")
         return
 
     def __repr__(self):

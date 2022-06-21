@@ -64,7 +64,7 @@ class Instance(object):
         self.terminating = False
         self.deadline = None
 
-        self.capacity = 3  # self.concurrency_limit
+        self.capacity = 2  # self.concurrency_limit
         self.queuepoxy = Breaker(f"Instance {self.func}", self.capacity)
 
     def serve(self, request: Request):
@@ -72,7 +72,8 @@ class Instance(object):
         self.hosted_job = request
         has_spare_core = self.node.book_core(self)
         if has_spare_core:
-            request.start()
+            if not request.is_running:
+                request.start()
             sim.log.info(f"Instance: serving {request} on {self.node.name}")
         # else:
             # sim.log.info(f"Instance: {self.node.name} does not have spare cores")
@@ -92,6 +93,7 @@ class Instance(object):
         else:
             if self.queuepoxy.has_slots():
                 sim.log.info("Reserved a slot")
+                # request.duration *= 0.9
                 self.queuepoxy.enqueue(request)
                 return True
             else:

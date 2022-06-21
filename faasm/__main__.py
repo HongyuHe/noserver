@@ -8,15 +8,16 @@ import simulation as sim
 
 
 def run_rps_mode():
-    runtime_milli = 1e3  # 1s
+    runtime_milli = int(1e3)  # 1s
     memory_mib = 170
     num_functions = 1
     num_workers = 1
+    num_cores = 16
 
     clock = sim.Clock()
     functions = [Function(name=f"func-{i}") for i in range(num_functions)]
     nodes = [
-        Node(name=f"worker-{i}", num_cores=16, memory_mib=64 * 2 ** 10)
+        Node(name=f"worker-{i}", num_cores=num_cores, memory_mib=64 * 2 ** 10)
         for i in range(num_workers)
     ]
     cluster = Cluster(clock, nodes, functions)
@@ -41,7 +42,7 @@ def run_rps_mode():
                     timestamp=clock.now(),
                     rps=rps,
                     dest=functions[func_idx].name,
-                    duration=runtime_milli,
+                    duration=runtime_milli if rps > num_cores else random.randint(runtime_milli-100, runtime_milli),
                     memory=memory_mib
                 )
                 cluster.accept(request)
