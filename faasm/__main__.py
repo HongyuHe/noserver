@@ -8,7 +8,7 @@ import math
 def run_rps_mode():
     runtime_milli = int(1e3)  # 1s
     memory_mib = 170
-    num_functions = 1
+    num_functions = 10
     num_workers = 1
     num_cores = 16
 

@@ -5,6 +5,12 @@ import simulation as sim
 import random
 random.seed(42)
 
+SYSTEM_TAX_MILLI = 5
+
+
+def get_system_tax(node_cpu_utilisation, node_mem_usage):
+    return random.randint(SYSTEM_TAX_MILLI, int(SYSTEM_TAX_MILLI * (100+node_cpu_utilisation)/100))
+
 
 class Request(object):
     def __init__(self, index, timestamp, rps, dest, duration, memory):
@@ -24,11 +30,11 @@ class Request(object):
         self.is_running = True
         return
 
-    def stop(self):
+    def stop(self, node_cpu_utilisation, node_mem_usage):
         if not self.is_running:
             raise RuntimeError(f"Try to finish request not yet started!")
 
-        self.end_time = sim.state.clock.now()
+        self.end_time = sim.state.clock.now() + get_system_tax(node_cpu_utilisation, node_mem_usage)
         self.is_running = False
         return
 
@@ -67,7 +73,7 @@ class Instance(object):
         self.deadline = None
 
         self.capacity = 1  # self.concurrency_limit
-        self.queuepoxy = Breaker(f"Instance {self.func}", self.capacity)
+        self.breaker = Breaker(f"Instance {self.func}", self.capacity)
 
     def serve(self, request: Request):
         self.idle = False
@@ -90,13 +96,13 @@ class Instance(object):
 
         if self.idle:
             self.serve(request)
-            self.queuepoxy.enqueue(request)
+            self.breaker.enqueue(request)
             return True
         else:
-            if self.queuepoxy.has_slots():
+            if self.breaker.has_slots():
                 sim.log.info("Reserved a slot")
                 # request.duration *= 0.9
-                self.queuepoxy.enqueue(request)
+                self.breaker.enqueue(request)
                 return True
             else:
                 # sim.log.info("No free slots")
@@ -115,15 +121,15 @@ class Instance(object):
 
         if self.idle and not self.terminating:
             # * Load the next job (None if there the queue is empty).
-            next_request = next(self.queuepoxy.first())
+            next_request = next(self.breaker.first())
             if next_request is not None:
                 # self.hosted_job = next_request
                 self.serve(next_request)
         return
 
     def finish(self, request: Request):
-        request.stop()
-        self.queuepoxy.dequeue(request)
+        request.stop(*self.node.get_utilisations())
+        self.breaker.dequeue(request)
         self.node.yield_core(self, request)
         self.hosted_job = None
         self.idle = True

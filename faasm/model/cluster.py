@@ -5,23 +5,21 @@ sys.path.append("..")
 import simulation as sim
 
 from .components import *
-from .function import Function, Instance, Request, Breaker
+from .function import Function, Instance, Request
 
 from typing import *
 from collections import OrderedDict
-from pprint import pprint
 
 CRI_ENGINE_PULLING = int(1000 / 100)  # * kubelet QPS of our the 500-node cluster.
 INSTANCE_SIZE_MIB = 400  # TODO: size of firecracker.
-COLD_INSTANCE_CREATION_DELAY_MILLI = 0  # TODO: measure CRI engine delay.
-WARM_INSTANCE_CREATION_DELAY_MILLI = 0
+COLD_INSTANCE_CREATION_DELAY_MILLI = 200  # TODO: measure CRI engine delay.
+WARM_INSTANCE_CREATION_DELAY_MILLI = 200
 
 INSTANCE_GRACE_PERIOD_SEC = 40  # Default K8s grace period (30s) + empirical delay (10s).
 
 MONITORING_PERIOD_MILLI = 1000
 MEMORY_OVERHEAD_MIB = 50
 MEMORY_USAGE_OFFSET = 5
-CORE_COUNT_OFFSET = 0  # * Context switch.
 
 
 # noinspection PyProtectedMember
@@ -30,7 +28,7 @@ class Node(object):
         self.cluster: Cluster
 
         self.name = name
-        self.num_cores = num_cores + CORE_COUNT_OFFSET
+        self.num_cores = num_cores
         self.memory_mib = memory_mib
         self.instance_limit = instance_limit
 
@@ -61,6 +59,7 @@ class Node(object):
                 occupancy += 1
         cpu_utilisation = occupancy / self.num_cores * 100
 
+        # * Consider both terminating and running instances.
         memory_used = 0
         for instance in self.instances:
             if instance.hosted_job is not None:
