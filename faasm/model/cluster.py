@@ -21,14 +21,16 @@ INSTANCE_GRACE_PERIOD_SEC = 40  # Default K8s grace period (30s) + empirical del
 MONITORING_PERIOD_MILLI = 1000
 MEMORY_OVERHEAD_MIB = 50
 MEMORY_USAGE_OFFSET = 5
+CORE_COUNT_OFFSET = 0  # * Context switch.
 
 
+# noinspection PyProtectedMember
 class Node(object):
     def __init__(self, name, num_cores, memory_mib, instance_limit=500):
         self.cluster: Cluster
 
         self.name = name
-        self.num_cores = num_cores
+        self.num_cores = num_cores + CORE_COUNT_OFFSET
         self.memory_mib = memory_mib
         self.instance_limit = instance_limit
 
@@ -36,6 +38,13 @@ class Node(object):
         self.instances: List[Instance] = []
         self.runqueue = []
         self.bindings = []
+        """ Binding object (~ K8s)
+        {
+            'time': now,
+            'func': func,
+            'quantity': num,
+        }
+        """
 
     def run(self):
         for instance in self.instances:
@@ -111,16 +120,17 @@ class Node(object):
 
     def reconcile(self):
         def is_cold_start(func):
-            for instance in self.instances:
-                if instance.func == func:
+            for _instance in self.instances:
+                if _instance.func == func:
                     return False
             return True
 
         if len(self.bindings) == 0: return
+
         # * Order by request time (FCFS).
         self.bindings = sorted(self.bindings, key=lambda r: r['time'])
         binding = self.bindings[0]  # * Only handle the first.
-
+        # for binding in self.bindings:
         tracker: Throttler._Tracker_ = sim.state.throttler.trackers[binding['func']]
 
         if binding['quantity'] > 0:
@@ -135,17 +145,24 @@ class Node(object):
                 return
 
             self.bindings.remove(binding)  # * Dequeue binding request.
-            new_instance = Instance(func=binding['func'], node=self)
-            self.instances.append(new_instance)
 
+            # # TODO: How many instances can containerd creates at a time?
             # * Assume one engine can only create one pod at a time.
+            new_instance = Instance(func=binding['func'], node=self)
             if binding['quantity'] > 1:
                 binding['quantity'] -= 1
                 self.bindings.append(binding)  # * Add the remaining back.
 
+            self.instances.append(new_instance)
             # TODO: Add discovery latency
             tracker.instances.append(new_instance)
 
+            # for i in range(binding['quantity']):
+            #     new_instance = Instance(func=binding['func'], node=self)
+            #     self.instances.append(new_instance)
+            #     # TODO: Add discovery latency
+            #     tracker.instances.append(new_instance)
+            #
             sim.log.info(f"Spawn {new_instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
 
         elif binding['quantity'] < 0:
@@ -260,7 +277,11 @@ class Cluster(object):
         active_cpu_avg = []
         for node in self.nodes:
             """This is K8s's view"""
-            total_running_instances += len(node.instances)
+            running_instances = 0
+            for instance in node.instances:
+                if not instance.terminating:
+                    running_instances += 1
+            total_running_instances += running_instances
             cpu, mem = node.get_utilisations()
             cpu_utilisations.append(cpu)
             mem_utilisations.append(mem)

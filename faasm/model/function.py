@@ -64,10 +64,11 @@ class Instance(object):
         self.terminating = False
         self.deadline = None
 
-        self.capacity = 1  # self.concurrency_limit
+        self.capacity = 3  # self.concurrency_limit
         self.queuepoxy = Breaker(f"Instance {self.func}", self.capacity)
 
     def serve(self, request: Request):
+        self.idle = False
         self.hosted_job = request
         has_spare_core = self.node.book_core(self)
         if has_spare_core:
@@ -80,17 +81,22 @@ class Instance(object):
     def reserve(self, request: Request):
         if request.dest != self.func:
             raise RuntimeError("Destination mismatch!")
-        if not self.queuepoxy.has_slots():
-            # sim.log.info("No free slots")
+
+        if self.terminating:
             return False
+
+        if self.idle:
+            self.serve(request)
+            self.queuepoxy.enqueue(request)
+            return True
         else:
-            if self.idle and not self.terminating:
-                self.idle = False
-                self.serve(request)
-            else:
+            if self.queuepoxy.has_slots():
                 sim.log.info("Reserved a slot")
                 self.queuepoxy.enqueue(request)
-            return True
+                return True
+            else:
+                # sim.log.info("No free slots")
+                return False
 
     def run(self):
         if self.hosted_job is not None:
@@ -107,7 +113,6 @@ class Instance(object):
             # * Load the next job (None if there the queue is empty).
             next_request = next(self.queuepoxy.first())
             if next_request is not None:
-                self.idle = False
                 # self.hosted_job = next_request
                 self.serve(next_request)
         return
@@ -148,7 +153,7 @@ class Breaker(object):
             yield None
 
     def enqueue(self, request: Request):
-        sim.log.info(f"Enqueue {request.dest}")
+        # sim.log.info(f"Enqueue {request.dest}")
 
         if len(self.queue) < self.capacity:
             self.queue.append(request)
@@ -159,7 +164,7 @@ class Breaker(object):
 
     def dequeue(self, request: Request):
         if request in self.queue:
-            sim.log.info(f"Dequeue {request.dest}")
+            # sim.log.info(f"Dequeue {request.dest}")
             self.queue.remove(request)
         return
 

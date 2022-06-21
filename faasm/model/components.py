@@ -104,7 +104,7 @@ class Throttler(object):
         return False
 
     def hit(self, request: Request):
-        sim.log.info(f"{request} hits!", {'clock': sim.state.clock.now()})
+        sim.log.info(f"Arrival {request}", {'clock': sim.state.clock.now()})
         tracker = self.trackers[request.dest]
         tracker_has_capacity = tracker.breaker.has_slots()
 
@@ -134,6 +134,7 @@ class Throttler(object):
         return
 
     def dispatch(self):
+        # TODO: Randomise dispatching order.
         # * Constantly trying to dispatch accumulated requests in both the central queue and the tracker queues.
         for request in self.breaker.first():
             if request is not None:
