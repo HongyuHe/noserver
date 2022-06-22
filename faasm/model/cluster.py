@@ -11,7 +11,7 @@ from typing import *
 from collections import OrderedDict
 
 CRI_ENGINE_PULLING = int(1000 / 100)  # * kubelet QPS of our the 500-node cluster.
-INSTANCE_SIZE_MIB = 400  # TODO: size of firecracker.
+INSTANCE_SIZE_MIB = 200  # TODO: size of firecracker.
 COLD_INSTANCE_CREATION_DELAY_MILLI = 200  # TODO: measure CRI engine delay.
 WARM_INSTANCE_CREATION_DELAY_MILLI = 200
 
@@ -64,6 +64,8 @@ class Node(object):
         for instance in self.instances:
             if instance.hosted_job is not None:
                 memory_used += instance.hosted_job.memory + MEMORY_OVERHEAD_MIB
+            else:
+                memory_used += INSTANCE_SIZE_MIB
         memory_usage = memory_used / self.memory_mib * 100
         return cpu_utilisation, memory_usage
 
