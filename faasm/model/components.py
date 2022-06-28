@@ -56,7 +56,7 @@ class Autoscaler(object):
 
             # * Decide mode.
             if is_over_panic_threshold or len(concurrencies) < STABLE_WINDOW_SEC:
-                sim.log.info(f"Start panicking", {'clock': sim.state.clock.now()})
+                # sim.log.info(f"Start panicking", {'clock': sim.state.clock.now()})
                 self.scalers[func].mode = 'panic'
                 desired_scale = math.ceil(panic_cc / cc_target)
             else:

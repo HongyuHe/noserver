@@ -8,7 +8,7 @@ import math
 def run_rps_mode():
     runtime_milli = int(1e3)  # 1s
     memory_mib = 170
-    num_functions = 1
+    num_functions = 50
     num_workers = 1
     num_cores = 16
 
@@ -44,7 +44,7 @@ def run_rps_mode():
                     duration=runtime_milli if rps > num_cores else random.randint(runtime_milli-100, runtime_milli),
                     memory=memory_mib
                 )
-                cluster.accept(request)
+                cluster.ingress_accept(request)
 
                 next_arrival += iat_milli
                 inv_index += 1
@@ -103,7 +103,7 @@ def run_test_mode():
                 duration=runtime_milli,
                 memory=memory_mib
             )
-            cluster.accept(request)
+            cluster.ingress_accept(request)
             sim.log.info('', {'clock': clock.now()})
 
             next_arrival += iat_milli

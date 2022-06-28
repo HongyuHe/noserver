@@ -11,9 +11,12 @@ from typing import *
 from collections import OrderedDict
 
 CRI_ENGINE_PULLING = int(1000 / 100)  # * kubelet QPS of our the 500-node cluster.
+
 INSTANCE_SIZE_MIB = 200  # TODO: size of firecracker.
-COLD_INSTANCE_CREATION_DELAY_MILLI = 200  # TODO: measure CRI engine delay.
+
+COLD_INSTANCE_CREATION_DELAY_MILLI = 2000  # TODO: measure CRI engine delay.
 WARM_INSTANCE_CREATION_DELAY_MILLI = 200
+BINDING_REQUESTS_CONGESTION_WINDOW_MILLI = AUTOSCALING_PERIOD_MILLI  # 2s
 
 INSTANCE_GRACE_PERIOD_SEC = 40  # Default K8s grace period (30s) + empirical delay (10s).
 
@@ -126,11 +129,23 @@ class Node(object):
                     return False
             return True
 
+        def get_congestion_multiplier():
+            first_request_ts = self.bindings[0]['time']
+            _multiplier = 0
+            for _binding in self.bindings:
+                if _binding['time'] - first_request_ts <= BINDING_REQUESTS_CONGESTION_WINDOW_MILLI:
+                    _multiplier += _binding['quantity']
+            return _multiplier if _multiplier > 0 else 1
+
+        ############################################
         if len(self.bindings) == 0: return
 
         # * Order by request time (FCFS).
         self.bindings = sorted(self.bindings, key=lambda r: r['time'])
-        binding = self.bindings[0]  # * Only handle the first.
+        # binding = self.bindings[0]  # * Only handle the first.
+
+        multiplier = get_congestion_multiplier()
+        # if multiplier>1: sim.log.info(f"{multiplier=}", {'clock': sim.state.clock.now()})
         for binding in self.bindings:
             tracker: Throttler._Tracker_ = sim.state.throttler.trackers[binding['func']]
 
@@ -140,6 +155,7 @@ class Node(object):
                 # TODO: Also, add the burst blocking delay.
 
                 cri_delay = COLD_INSTANCE_CREATION_DELAY_MILLI if is_cold_start(binding['func']) else WARM_INSTANCE_CREATION_DELAY_MILLI
+                cri_delay *= multiplier
 
                 if sim.state.clock.now() - binding['time'] < cri_delay:
                     # * CRI engine delay has not been fulfilled.
@@ -147,7 +163,7 @@ class Node(object):
 
                 self.bindings.remove(binding)  # * Dequeue binding request.
 
-                # # # TODO: How many instances can containerd creates at a time?
+                # # # TODO: How many instances can containerd create at a time?
                 # # * Assume one engine can only create one pod at a time.
                 # new_instance = Instance(func=binding['func'], node=self)
                 # if binding['quantity'] > 1:
@@ -159,7 +175,7 @@ class Node(object):
                 # tracker.instances.append(new_instance)
                 # sim.log.info(f"Spawn {new_instance.func=} on {self.name}", {'clock': sim.state.clock.now()})
 
-                # TODO: How many instances can containerd creates at a time?
+                # TODO: How many instances can containerd create at a time?
                 for i in range(binding['quantity']):
                     new_instance = Instance(func=binding['func'], node=self)
                     self.instances.append(new_instance)
@@ -244,7 +260,7 @@ class Cluster(object):
             self.monitor()
         return
 
-    def accept(self, request: Request):
+    def ingress_accept(self, request: Request):
         self.throttler.hit(request)
         return
 
@@ -297,9 +313,9 @@ class Cluster(object):
             'actual_scale': total_actual_scale,
             'desired_scale': total_desired_scale,
             'running_instances': total_running_instances,
-            'worker_cpu_avg': sum(cpu_utilisations)/len(cpu_utilisations),
-            'worker_mem_avg': sum(mem_utilisations)/len(mem_utilisations) + MEMORY_USAGE_OFFSET,
-            'active_worker_cpu_avg': sum(active_cpu_avg)/len(active_cpu_avg) if len(active_cpu_avg) > 0 else 0,
+            'worker_cpu_avg': sum(cpu_utilisations) / len(cpu_utilisations),
+            'worker_mem_avg': sum(mem_utilisations) / len(mem_utilisations) + MEMORY_USAGE_OFFSET,
+            'active_worker_cpu_avg': sum(active_cpu_avg) / len(active_cpu_avg) if len(active_cpu_avg) > 0 else 0,
         }
         self.trace.append(record)
         return
