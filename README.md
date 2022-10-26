@@ -1,13 +1,13 @@
-# FaaSm
+# FaaSim
 
-FaaSm is a discrete-event simulator for modeling main-stream serverless systems.
+FaaSim is a discrete-event simulator for modeling main-stream serverless systems.
 It disaggregates the three scheduling dimensions: (1) load balancing, (2) autoscaling, and (3) placement. The algorithms of each dimension are pluggable, enabling the exploration of multiple policy choices in one system.
 
 **NB:** This is a prototype that I developed as a proof of concept for my research. A mature version in Golang is in the making at ETH. 
 
 (contact: Hongyu He \<honghe@inf.ethz.ch\>)
 
-![Architecture of FaaSm](.github/figures/faasm_arch.png?raw=true "Architecture of FaaSm")
+![Architecture of FaaSim](.github/figures/faasim_arch.png?raw=true "Architecture of FaaSim")
 
 ## Setup
 
@@ -18,7 +18,7 @@ $ pip3 install -r requirements_dev.txt
 ## Run
 
 ```bash
-$ python3 faasm <rps | test>
+$ python3 faasim <rps | test>
 ```
 
 ## Validation
