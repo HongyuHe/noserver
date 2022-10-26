@@ -1,4 +1,4 @@
-* faasm version:
+* faasim version:
 * Python version:
 * Operating System:
 

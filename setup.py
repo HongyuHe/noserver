@@ -31,7 +31,7 @@ setup(
     description="''",
     entry_points={
         'console_scripts': [
-            'faasm=serverless_model.__main__:main',
+            'faasim=serverless_model.__main__:main',
         ],
     },
     install_requires=requirements,
@@ -39,12 +39,12 @@ setup(
     long_description=readme + '\n\n' + history,
     long_description_content_type='text/markdown',
     include_package_data=True,
-    keywords='faasm',
-    name='faasm',
+    keywords='faasim',
+    name='faasim',
     packages=find_packages(include=['serverless_model', 'serverless_model.*']),
     test_suite='tests',
     tests_require=test_requirements,
-    url='https://github.com/eth-easl/faasm.git',
-    version='0.0.0',
+    url='https://github.com/eth-easl/faasim.git',
+    version='0.1.0',
     zip_safe=False,
 )
