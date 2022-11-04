@@ -3,9 +3,7 @@
 FaaSim is a discrete-event simulator for modeling main-stream serverless systems.
 It disaggregates the three scheduling dimensions: (1) load balancing, (2) autoscaling, and (3) placement. The algorithms of each dimension are pluggable, enabling the exploration of multiple policy choices in one system.
 
-**NB:** This is a prototype that I developed as a proof of concept for my research. A mature version in Golang is in the making at ETH. 
-
-(contact: Hongyu He \<honghe@inf.ethz.ch\>)
+( This is a prototype that I developed as a proof of concept for my research at ETH. For more details: Hongyu He \<honghe@inf.ethz.ch\> )
 
 ![Architecture of FaaSim](.github/figures/faasim_arch.png?raw=true "Architecture of FaaSim")
 
@@ -59,10 +57,3 @@ In the following experiments, the system was not warmed up in order to preserve 
 
 ![Validation of Autoscaling](.github/figures/validate_scale.png?raw=true "Validation of Autoscaling")
 
-
----
-## TODO
-
-- [ ] Conduct validation with more functions.
-- [ ] Implemement instance placement and load balancing.
-- [ ] Conduct validation with more workers.
