@@ -1,0 +1,9 @@
+timestamp,dag_name,num_invocations
+0,test_s512_m170_t1000,1
+626,test_s512_m170_t1000,1
+686,test_s512_m170_t1000,1
+1687,test_s512_m170_t1000,1
+1900,test_s512_m170_t1000,1
+2569,test_s512_m170_t1000,1
+6557,test_s512_m170_t1000,1
+7773,test_s512_m170_t1000,1

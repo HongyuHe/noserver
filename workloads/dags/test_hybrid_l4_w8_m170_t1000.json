@@ -1,0 +1,337 @@
+
+{
+    "Comment": "serial",
+    "StartAt": [
+
+		"F0",
+		"F1",
+		"F2",
+		"F3",
+		"F4",
+		"F5",
+		"F6",
+		"F7"
+    ],
+    "Functions": {
+
+        "F0": {
+            "Next": [
+                "F8"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F8": {
+            "Next": [
+                "F16"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F16": {
+            "Next": [
+                "F24"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F1": {
+            "Next": [
+                "F9"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F9": {
+            "Next": [
+                "F17"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F17": {
+            "Next": [
+                "F25"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F2": {
+            "Next": [
+                "F10"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F10": {
+            "Next": [
+                "F18"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F18": {
+            "Next": [
+                "F26"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F3": {
+            "Next": [
+                "F11"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F11": {
+            "Next": [
+                "F19"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F19": {
+            "Next": [
+                "F27"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F4": {
+            "Next": [
+                "F12"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F12": {
+            "Next": [
+                "F20"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F20": {
+            "Next": [
+                "F28"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F5": {
+            "Next": [
+                "F13"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F13": {
+            "Next": [
+                "F21"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F21": {
+            "Next": [
+                "F29"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F6": {
+            "Next": [
+                "F14"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F14": {
+            "Next": [
+                "F22"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F22": {
+            "Next": [
+                "F30"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F7": {
+            "Next": [
+                "F15"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F15": {
+            "Next": [
+                "F23"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F23": {
+            "Next": [
+                "F31"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F24": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F25": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F26": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F27": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F28": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F29": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F30": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F31": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        }
+    }
+}

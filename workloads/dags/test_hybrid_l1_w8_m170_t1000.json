@@ -1,0 +1,97 @@
+
+{
+    "Comment": "serial",
+    "StartAt": [
+
+		"F0",
+		"F1",
+		"F2",
+		"F3",
+		"F4",
+		"F5",
+		"F6",
+		"F7"
+    ],
+    "Functions": {
+
+        "F0": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F1": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F2": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F3": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F4": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F5": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F6": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F7": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        }
+    }
+}

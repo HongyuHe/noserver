@@ -1,0 +1,5 @@
+timestamp,dag_name,num_invocations
+10,hybrid,20
+10,serial,20
+20,parallel,20
+30,serial,20

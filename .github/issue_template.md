@@ -1,4 +1,4 @@
-* faasim version:
+* noserver version:
 * Python version:
 * Operating System:
 

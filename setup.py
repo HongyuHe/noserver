@@ -31,7 +31,7 @@ setup(
     description="''",
     entry_points={
         'console_scripts': [
-            'faasim=serverless_model.__main__:main',
+            'noserver=noserver.__main__:main',
         ],
     },
     install_requires=requirements,
@@ -39,12 +39,12 @@ setup(
     long_description=readme + '\n\n' + history,
     long_description_content_type='text/markdown',
     include_package_data=True,
-    keywords='faasim',
-    name='faasim',
-    packages=find_packages(include=['serverless_model', 'serverless_model.*']),
+    keywords='noserver',
+    name='noserver',
+    packages=find_packages(include=['noserver', 'noserver.*']),
     test_suite='tests',
     tests_require=test_requirements,
-    url='https://github.com/eth-easl/faasim.git',
+    url='https://github.com/eth-easl/noserver.git',
     version='0.1.0',
     zip_safe=False,
 )

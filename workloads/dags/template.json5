@@ -1,0 +1,15 @@
+// Mimic AWS: https://docs.aws.amazon.com/step-functions/latest/dg/concepts-amazon-states-language.html
+{
+  "Comment": "A DAG workload",
+  "StartAt": ["F1"], // * Not used.
+  "Functions":  {
+    "F1": {
+        "Next":  [], // * Successors.
+        "DurationMilli":  [0],
+        "DurationProbs": [1.0],
+        "MemoryMib":  [0],
+        "MemoryProbs": [1.0],
+        "UseHarvest": true, // TODO: Flag for using HarvestVM.
+    }
+  }
+}

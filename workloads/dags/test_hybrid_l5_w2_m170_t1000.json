@@ -1,0 +1,111 @@
+
+{
+    "Comment": "serial",
+    "StartAt": [
+
+		"F0",
+		"F1"
+    ],
+    "Functions": {
+
+        "F0": {
+            "Next": [
+                "F2"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F2": {
+            "Next": [
+                "F4"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F4": {
+            "Next": [
+                "F6"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F6": {
+            "Next": [
+                "F8"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F1": {
+            "Next": [
+                "F3"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F3": {
+            "Next": [
+                "F5"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F5": {
+            "Next": [
+                "F7"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F7": {
+            "Next": [
+                "F9"
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F8": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F9": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        }
+    }
+}

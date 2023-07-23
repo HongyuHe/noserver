@@ -1,0 +1,53 @@
+
+{
+    "Comment": "serial",
+    "StartAt": [
+
+		"F0",
+		"F1",
+		"F2",
+		"F3"
+    ],
+    "Functions": {
+
+        "F0": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F1": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F2": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        },
+
+        "F3": {
+            "Next": [
+                
+            ],
+            "DurationMilli": [
+                1000
+            ],
+            "MemoryMib": [170]
+        }
+    }
+}
