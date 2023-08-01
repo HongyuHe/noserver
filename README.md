@@ -1,6 +1,10 @@
 # NoServer 凵
 **NoServer is a full-system, queuing simulator for serverless workflows.**
 
+<p align="center">
+    <img src=".github/figures/abstractions.png?raw=true" width="300">
+</p>
+
 ### Key Features
 
 * Supports serverless workflows, scalable to thousands function instances and hundreds of nodes.
@@ -10,8 +14,9 @@
 * Models hyterogeneous worker types (e.g., Harvest VMs).
 
 <p align="center">
-    <img src=".github/figures/abstractions.png?raw=true" width="330">
+    <img src=".github/figures/dag.png?raw=true" width="300">
 </p>
+
 
 
 ## Overview
